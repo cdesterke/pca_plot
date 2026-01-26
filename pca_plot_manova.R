@@ -10,8 +10,27 @@ pca_plot(process,
          show_manova = TRUE)
 
 
+## custom palette
+palette16 <- c(
+  "#1F77B4", "#FF7F0E", "#2CA02C", "#D62728",
+  "#9467BD", "#8C564B", "#E377C2", "#7F7F7F",
+  "#BCBD22", "#17BECF", "#4C72B0", "#55A868",
+  "#C44E52", "#8172B2", "#CCB974", "#64B5CD"
+)
+
+pca_plot(process,
+         pheno,
+         group = "group",
+         point_shape = "batch",
+         pal = palette16 ,
+         ellipse_conf = 0.75,
+         point_size = 5,
+         base_size = 18,
+         title = "PCA Group vs Batch",
+         show_manova = TRUE)
 
 
+##fonction
 
 pca_plot <- function(data,
                      pheno,
@@ -126,3 +145,4 @@ pca_plot <- function(data,
 
   return(p)
 }
+
