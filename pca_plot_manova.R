@@ -18,20 +18,6 @@ palette16 <- c(
   "#C44E52", "#8172B2", "#CCB974", "#64B5CD"
 )
 
-pca_plot(process,
-         pheno,
-         group = "group",
-         point_shape = "batch",
-         pal = palette16 ,
-         ellipse_conf = 0.75,
-         point_size = 5,
-         base_size = 18,
-         title = "PCA Group vs Batch",
-         show_manova = TRUE)
-
-
-##fonction
-
 pca_plot <- function(data,
                      pheno,
                      group,
@@ -51,25 +37,29 @@ pca_plot <- function(data,
                      show_manova = FALSE,
                      return_pca = FALSE){
 
+  library(ggplot2)
+  library(dplyr)
+  library(ggrepel)
+
   # --- Palette auto robuste ---
   .auto_palette <- function(groups) {
     n <- length(groups)
     if (n == 1) return("#1f77b4")
     if (n == 2) return(c("#1f77b4", "#ff7f0e"))
     if (n <= 8) return(RColorBrewer::brewer.pal(n, "Dark2"))
-    return(viridisLite::viridis(n))
+    viridisLite::viridis(n)
   }
 
-  # --- VÃ©rification + conversion ---
-  if (!is.data.frame(data)) stop("'data' doit Ãªtre un data.frame numÃ©rique.")
-  if (!all(sapply(data, is.numeric))) stop("Toutes les colonnes de 'data' doivent Ãªtre numÃ©riques.")
+  # --- Vérification ---
+  if (!is.data.frame(data)) stop("'data' doit être un data.frame numérique.")
+  if (!all(sapply(data, is.numeric))) stop("Toutes les colonnes de 'data' doivent être numériques.")
+
   mat <- as.matrix(data)
 
   # --- PCA ---
-  trans <- t(mat)
-  pca <- prcomp(trans, scale. = scale)
+  pca <- prcomp(t(mat), scale. = scale)
 
-  # --- Variance expliquÃ©e ---
+  # --- Variance expliquée ---
   var_expl <- (pca$sdev^2) / sum(pca$sdev^2)
   xlab <- paste0("PC", x, " (", round(var_expl[x] * 100, 1), "%)")
   ylab <- paste0("PC", y, " (", round(var_expl[y] * 100, 1), "%)")
@@ -80,7 +70,7 @@ pca_plot <- function(data,
   df$PC2 <- pca$x[, y]
   df$group_var <- df[[group]]
 
-  # --- MANOVA sur PC1 + PC2 ---
+  # --- MANOVA ---
   subtitle_text <- NULL
   if (isTRUE(show_manova)) {
     manova_res <- summary(manova(cbind(PC1, PC2) ~ group_var, data = df))
@@ -88,26 +78,28 @@ pca_plot <- function(data,
     subtitle_text <- paste0("MANOVA (PC1+PC2): p = ", signif(pval, 3))
   }
 
-  # --- Aesthetics pour les points ---
+  # --- Aesthetics ---
   aes_points <- aes(
     x = PC1,
     y = PC2,
     color = !!as.name(group)
   )
 
+  # --- Shapes optionnels (corrigé) ---
   if (!is.null(point_shape)) {
+    df[[point_shape]] <- as.factor(df[[point_shape]])
     aes_points$shape <- as.name(point_shape)
   }
 
-  # --- Plot de base ---
+  # --- Plot ---
   p <- ggplot(df, aes_points) +
-       geom_point(size = point_size, alpha = alpha) +
-       theme_classic(base_size = base_size) +
-       labs(x = xlab, y = ylab, title = title, subtitle = subtitle_text) +
-       theme(legend.position = legend_position)
+    geom_point(size = point_size, alpha = alpha) +
+    theme_classic(base_size = base_size) +
+    labs(x = xlab, y = ylab, title = title, subtitle = subtitle_text) +
+    theme(legend.position = legend_position)
 
-  # --- Palette ---
-  if (is.character(pal) && length(pal) == 1 && pal == "auto") {
+  # --- Palette couleurs ---
+  if (is.character(pal) && pal == "auto") {
     pal_vals <- .auto_palette(unique(df[[group]]))
     p <- p + scale_color_manual(values = pal_vals)
   } else if (is.character(pal) && length(pal) == 1) {
@@ -116,12 +108,22 @@ pca_plot <- function(data,
     p <- p + scale_color_manual(values = pal)
   }
 
-  # --- Ellipses uniquement selon group ---
+  # --- Palette shapes (corrigée : 0–25) ---
+  if (!is.null(point_shape)) {
+    p <- p + scale_shape_manual(values = c(0:25))
+  }
+
+  # --- Ellipses (corrigées : basées uniquement sur group) ---
   if (isTRUE(show_ellipses)) {
     p <- p +
       stat_ellipse(
         data = df,
-        aes(x = PC1, y = PC2, color = !!as.name(group)),
+        mapping = aes(
+          x = PC1,
+          y = PC2,
+          group = !!as.name(group),
+          color = !!as.name(group)
+        ),
         level = ellipse_conf,
         linewidth = 1,
         linetype = "dashed",
@@ -132,7 +134,7 @@ pca_plot <- function(data,
   # --- Labels ---
   if (isTRUE(names)) {
     p <- p +
-      ggrepel::geom_text_repel(
+      geom_text_repel(
         label = rownames(df),
         size = base_size / 4
       )
@@ -140,9 +142,12 @@ pca_plot <- function(data,
 
   # --- Retour optionnel ---
   if (return_pca) {
-    return(list(plot = p, pca = pca, manova_p = if (show_manova) pval else NULL))
+    return(list(
+      plot = p,
+      pca = pca,
+      manova_p = if (show_manova) pval else NULL
+    ))
   }
 
   return(p)
 }
-
