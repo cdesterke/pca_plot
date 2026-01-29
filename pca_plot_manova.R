@@ -50,7 +50,7 @@ pca_plot <- function(data,
     viridisLite::viridis(n)
   }
 
-  # --- Vérification ---
+  # --- Vérifications ---
   if (!is.data.frame(data)) stop("'data' doit être un data.frame numérique.")
   if (!all(sapply(data, is.numeric))) stop("Toutes les colonnes de 'data' doivent être numériques.")
 
@@ -85,7 +85,7 @@ pca_plot <- function(data,
     color = !!as.name(group)
   )
 
-  # --- Shapes optionnels (corrigé) ---
+  # --- Shapes optionnels (pleins privilégiés) ---
   if (!is.null(point_shape)) {
     df[[point_shape]] <- as.factor(df[[point_shape]])
     aes_points$shape <- as.name(point_shape)
@@ -108,9 +108,13 @@ pca_plot <- function(data,
     p <- p + scale_color_manual(values = pal)
   }
 
-  # --- Palette shapes (corrigée : 0–25) ---
+  # --- Palette shapes (pleins → mixtes → vides) ---
   if (!is.null(point_shape)) {
-    p <- p + scale_shape_manual(values = c(0:25))
+    p <- p + scale_shape_manual(values = c(
+      16, 17, 15, 18, 19, 20,   # formes pleines
+      21, 22, 23, 24, 25,       # formes mixtes
+      0:14                      # formes vides si beaucoup de groupes
+    ))
   }
 
   # --- Ellipses (corrigées : basées uniquement sur group) ---
