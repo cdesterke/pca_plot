@@ -1,0 +1,155 @@
+tsne_plot(ssres,
+          phenotype,
+          group = "group",
+          point_shape = "tissue",
+          pal = "auto",
+          ellipse_conf = 0.75,
+          point_size = 5,
+          base_size = 18,
+          perplexity = 30,
+          max_iter = 1500,
+          title = "t-SNE Group vs Batch",
+          show_manova = TRUE)
+
+
+
+
+tsne_plot <- function(data,
+                      pheno,
+                      group,
+                      names = FALSE,
+                      perplexity = 30,
+                      max_iter = 1000,
+                      alpha = 0.7,
+                      point_size = 4,
+                      base_size = 16,
+                      title = NULL,
+                      pal = "auto",
+                      scale = TRUE,
+                      ellipse_conf = 0.95,
+                      show_ellipses = TRUE,
+                      legend_position = "right",
+                      point_shape = NULL,
+                      show_manova = FALSE,
+                      return_tsne = FALSE){
+
+  library(ggplot2)
+  library(dplyr)
+  library(ggrepel)
+  library(Rtsne)
+
+  # --- Palette auto robuste ---
+  .auto_palette <- function(groups) {
+    n <- length(groups)
+    if (n == 1) return("#1f77b4")
+    if (n == 2) return(c("#1f77b4", "#ff7f0e"))
+    if (n <= 8) return(RColorBrewer::brewer.pal(n, "Dark2"))
+    viridisLite::viridis(n)
+  }
+
+  # --- Vérifications ---
+  if (!is.data.frame(data)) stop("'data' doit être un data.frame numérique.")
+  if (!all(sapply(data, is.numeric))) stop("Toutes les colonnes doivent être numériques.")
+
+  mat <- as.matrix(data)
+  if (scale) mat <- scale(t(mat)) else mat <- t(mat)
+
+  # --- t-SNE ---
+  ts <- Rtsne(mat,
+              perplexity = perplexity,
+              max_iter = max_iter,
+              check_duplicates = FALSE)
+
+  # --- DataFrame ---
+  df <- pheno
+  df$TSNE1 <- ts$Y[, 1]
+  df$TSNE2 <- ts$Y[, 2]
+  df$group_var <- df[[group]]
+
+  # --- MANOVA (TSNE1 + TSNE2) ---
+  subtitle_text <- NULL
+  if (isTRUE(show_manova)) {
+    manova_res <- summary(manova(cbind(TSNE1, TSNE2) ~ group_var, data = df))
+    pval <- manova_res$stats[1, "Pr(>F)"]
+    subtitle_text <- paste0("MANOVA (t-SNE1 + t-SNE2): p = ", signif(pval, 3))
+  }
+
+  # --- Aesthetics ---
+  aes_points <- aes(
+    x = TSNE1,
+    y = TSNE2,
+    color = !!as.name(group)
+  )
+
+  # --- Shapes optionnels (pleins privilégiés) ---
+  if (!is.null(point_shape)) {
+    df[[point_shape]] <- as.factor(df[[point_shape]])
+    aes_points$shape <- as.name(point_shape)
+  }
+
+  # --- Plot ---
+  p <- ggplot(df, aes_points) +
+    geom_point(size = point_size, alpha = alpha) +
+    theme_classic(base_size = base_size) +
+    labs(x = "t-SNE 1", y = "t-SNE 2",
+         title = title,
+         subtitle = subtitle_text) +
+    theme(legend.position = legend_position)
+
+  # --- Palette couleurs ---
+  if (is.character(pal) && pal == "auto") {
+    pal_vals <- .auto_palette(unique(df[[group]]))
+    p <- p + scale_color_manual(values = pal_vals)
+  } else if (is.character(pal) && length(pal) == 1) {
+    p <- p + scale_color_brewer(palette = pal)
+  } else {
+    p <- p + scale_color_manual(values = pal)
+  }
+
+  # --- Palette shapes (pleins → mixtes → vides) ---
+  if (!is.null(point_shape)) {
+    p <- p + scale_shape_manual(values = c(
+      16, 17, 15, 18, 19, 20,   # formes pleines
+      21, 22, 23, 24, 25,       # formes mixtes
+      0:14                      # formes vides si beaucoup de groupes
+    ))
+  }
+
+  # --- Ellipses (basées uniquement sur group) ---
+  if (isTRUE(show_ellipses)) {
+    p <- p +
+      stat_ellipse(
+        data = df,
+        mapping = aes(
+          x = TSNE1,
+          y = TSNE2,
+          group = !!as.name(group),
+          color = !!as.name(group)
+        ),
+        level = ellipse_conf,
+        linewidth = 1,
+        linetype = "dashed",
+        inherit.aes = FALSE
+      )
+  }
+
+  # --- Labels ---
+  if (isTRUE(names)) {
+    p <- p +
+      geom_text_repel(
+        label = rownames(df),
+        size = base_size / 4
+      )
+  }
+
+  # --- Retour optionnel ---
+  if (return_tsne) {
+    return(list(
+      plot = p,
+      tsne = ts,
+      manova_p = if (show_manova) pval else NULL
+    ))
+  }
+
+  return(p)
+}
