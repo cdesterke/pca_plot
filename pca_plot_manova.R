@@ -35,7 +35,7 @@ pca_plot <- function(data,
                      legend_position = "right",
                      point_shape = NULL,
                      show_manova = FALSE,
-                     return_pca = FALSE){
+                     return_pca = FALSE) {
 
   library(ggplot2)
   library(dplyr)
@@ -50,9 +50,20 @@ pca_plot <- function(data,
     viridisLite::viridis(n)
   }
 
+  # --- Shapes distincts (pleins → mixtes → vides) ---
+  .distinct_shapes <- function(n) {
+    base_shapes <- c(
+      16, 17, 15, 18, 25, 24,   # pleins distincts
+      21, 22, 23,               # mixtes
+      0, 1, 2, 5, 6, 7, 8, 9    # vides
+    )
+    base_shapes[seq_len(min(n, length(base_shapes)))]
+  }
+
   # --- Vérifications ---
   if (!is.data.frame(data)) stop("'data' doit être un data.frame numérique.")
   if (!all(sapply(data, is.numeric))) stop("Toutes les colonnes de 'data' doivent être numériques.")
+  if (!group %in% colnames(pheno)) stop("La variable 'group' n'existe pas dans pheno.")
 
   mat <- as.matrix(data)
 
@@ -85,7 +96,7 @@ pca_plot <- function(data,
     color = !!as.name(group)
   )
 
-  # --- Shapes optionnels (pleins privilégiés) ---
+  # --- Shapes optionnels ---
   if (!is.null(point_shape)) {
     df[[point_shape]] <- as.factor(df[[point_shape]])
     aes_points$shape <- as.name(point_shape)
@@ -108,16 +119,13 @@ pca_plot <- function(data,
     p <- p + scale_color_manual(values = pal)
   }
 
-  # --- Palette shapes (pleins → mixtes → vides) ---
+  # --- Palette shapes ---
   if (!is.null(point_shape)) {
-    p <- p + scale_shape_manual(values = c(
-      16, 17, 15, 18, 19, 20,   # formes pleines
-      21, 22, 23, 24, 25,       # formes mixtes
-      0:14                      # formes vides si beaucoup de groupes
-    ))
+    n_shapes <- length(unique(df[[point_shape]]))
+    p <- p + scale_shape_manual(values = .distinct_shapes(n_shapes))
   }
 
-  # --- Ellipses (corrigées : basées uniquement sur group) ---
+  # --- Ellipses ---
   if (isTRUE(show_ellipses)) {
     p <- p +
       stat_ellipse(
