@@ -109,15 +109,29 @@ pca_plot <- function(data,
     labs(x = xlab, y = ylab, title = title, subtitle = subtitle_text) +
     theme(legend.position = legend_position)
 
+
   # --- Palette couleurs ---
-  if (is.character(pal) && pal == "auto") {
+# --- Palette couleurs ---
+  if (is.character(pal) && length(pal) == 1 && pal == "auto") {
+
+    # palette automatique interne
     pal_vals <- .auto_palette(unique(df[[group]]))
     p <- p + scale_color_manual(values = pal_vals)
-  } else if (is.character(pal) && length(pal) == 1) {
+
+  } else if (is.character(pal) && length(pal) == 1 &&
+           pal %in% rownames(RColorBrewer::brewer.pal.info)) {
+
+    # palette brewer
     p <- p + scale_color_brewer(palette = pal)
+
   } else {
+
+    # palette custom (vecteur de couleurs)
     p <- p + scale_color_manual(values = pal)
   }
+
+
+
 
   # --- Palette shapes ---
   if (!is.null(point_shape)) {
